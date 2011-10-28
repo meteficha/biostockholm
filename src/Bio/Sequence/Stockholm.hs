@@ -34,20 +34,29 @@ module Bio.Sequence.Stockholm
     )
     where
 
-import qualified Data.ByteString.Lazy.Char8 as B
-import qualified Data.Map as M
-import Bio.Core.Sequence
+-- from base
 import Control.Applicative ((<$>))
 import Control.Arrow (second)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (mplus)
-import Control.Monad.Exception.Synchronous (Exceptional, throw)
-import Data.ByteString.Lazy.Char8 (ByteString)
 import Data.Char
 import Data.String
 import Data.List (foldl', find)
 import Data.Maybe (fromMaybe)
 import Data.Typeable
+
+-- from containers
+import qualified Data.Map as M
+
+-- from bytestring
+import qualified Data.ByteString.Lazy.Char8 as B
+import Data.ByteString.Lazy.Char8 (ByteString)
+
+-- from biocore
+import Bio.Core.Sequence
+
+-- from explicit-exception
+import Control.Monad.Exception.Synchronous (Exceptional, throw)
 
 #ifdef TEST
 import qualified Data.Set as S
