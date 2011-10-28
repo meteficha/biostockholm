@@ -85,6 +85,11 @@ data StockholmSeq = StSeq !SeqLabel
 instance NFData StockholmSeq where
     rnf (StSeq _ _ sa ca) = rnf sa `seq` rnf ca
 
+instance BioSeq StockholmSeq where
+    seqlabel  (StSeq sl _ _ _) = sl
+    seqdata   (StSeq _ sd _ _) = sd
+    seqlength (StSeq _ sd _ _) = Offset $ B.length (unSD sd)
+
 -- | A generic annotation.
 data Ann d = Ann { feature :: !d
                  , text    :: !ByteString
