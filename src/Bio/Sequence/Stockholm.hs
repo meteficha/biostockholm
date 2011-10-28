@@ -39,11 +39,10 @@ import Control.Applicative ((<$>))
 import Control.Arrow (second)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (mplus)
-import Data.Char
-import Data.String
+import Data.Char (isSpace)
 import Data.List (foldl', find)
 import Data.Maybe (fromMaybe)
-import Data.Typeable
+import Data.Typeable (Typeable)
 
 -- from containers
 import qualified Data.Map as M
@@ -365,7 +364,7 @@ parseStockholm' = header . filter (not . B.null)
           | h == stockholm = do (annots,seqs) <- go initial hs
                                 return (makeStockholm annots seqs)
           | otherwise      = throw headerExc
-          where stockholm = fromString "# STOCKHOLM 1.0"
+          where stockholm = "# STOCKHOLM 1.0"
                 initial   = (M.empty, M.empty)
       header [] = throw emptyFileExc
 
