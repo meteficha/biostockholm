@@ -57,11 +57,11 @@ import Bio.Core.Sequence
 -- from explicit-exception
 import Control.Monad.Exception.Synchronous (Exceptional, throw)
 
+
 #ifdef TEST
-import qualified Data.Set as S
-import Test.Framework
-import Test.Framework.Providers.HUnit
-import Test.HUnit hiding (Test)
+import Test.Hspec.Monadic
+import Test.Hspec.HUnit ()
+import Test.HUnit
 #endif
 
 
@@ -240,17 +240,18 @@ parseAnn' = Ann . parseAnn
 
 
 #ifdef TEST
-test_parseAnnots :: Test
-test_parseAnnots = testGroup "parse*" [
-              testCase "1"  $ parseAnn "AC" @?= AC,
-              testCase "2"  $ parseAnn "SQ" @?= SQ,
-              testCase "3a" $ parseAnn "SS" @?= (SS :: ColumnAnnotation InSeq),
-              testCase "3b" $ parseAnn "SS" @?= (C_Other "SS" :: ColumnAnnotation InFile),
-              testCase "4a" $ parseAnn "SS_cons" @?= (SS :: ColumnAnnotation InFile),
-              testCase "4b" $ parseAnn "SS_cons" @?= (C_Other "SS_cons" :: ColumnAnnotation InSeq),
-              testCase "5a"  $ parseAnn "SS_CONS" @?= (C_Other "SS_CONS" :: ColumnAnnotation InSeq),
-              testCase "5b"  $ parseAnn "SS_CONS" @?= (C_Other "SS_CONS" :: ColumnAnnotation InFile),
-              testCase "6"  $ parseAnn "LO" @?= LO]
+test_parseAnnots :: Specs
+test_parseAnnots =
+    describe "parse*" $ do
+      it "1"  $ parseAnn "AC" @?= AC
+      it "2"  $ parseAnn "SQ" @?= SQ
+      it "3a" $ parseAnn "SS" @?= (SS :: ColumnAnnotation InSeq)
+      it "3b" $ parseAnn "SS" @?= (C_Other "SS" :: ColumnAnnotation InFile)
+      it "4a" $ parseAnn "SS_cons" @?= (SS :: ColumnAnnotation InFile)
+      it "4b" $ parseAnn "SS_cons" @?= (C_Other "SS_cons" :: ColumnAnnotation InSeq)
+      it "5a" $ parseAnn "SS_CONS" @?= (C_Other "SS_CONS" :: ColumnAnnotation InSeq)
+      it "5b" $ parseAnn "SS_CONS" @?= (C_Other "SS_CONS" :: ColumnAnnotation InFile)
+      it "6"  $ parseAnn "LO" @?= LO
 #endif
 
 
@@ -474,15 +475,12 @@ stockFile = B.unlines [
   "#=GC SS_cons :::",
   "// "]
 
-purine1, purine2, purine3, ss_cons :: SeqData
-purine1 = B.concat ["AAAAUUGAAUAUCGUUUUACUUGUUUAUGUC-GUGAAU-UGGCAC-GACGUU"
-                   ,"UCUACAAGGUG-CCGGAA--CACCUAACAAUAAGUAAGUCAGCAGUGAGAU"]
-purine2 = B.concat ["AAAAUUUAAUAA-GAAGCACUCAUAUAAUCCCGAGAAUAUGGCUCGGGAGUC"
-                   ,"UCUACCGAACAACCGUAAAUUGUUCGACUAUGAGUGAAAGUGUACCUAGGG"]
-purine3 = B.concat ["UGGCAGUAACUAGCGUCACUUCGUAUAACCCCAGUGAUAUGGAUUGGGGGUC"
-                   ,"UCUACCAGGAACCAAUAA--AUCCUGAUUACGAAGAGUUUAGUGCUUUAGU"]
-ss_cons = B.concat [":::::::::::::::::((((((((,,,<<<-<<<_______>>>->>>,,,"
-                   ,",,,,,<<<<<<_________>>>>>>,,)))))))):::::::::::::::"]
+purine1, purine2, purine3 :: SeqData
+ss_cons :: ByteString
+purine1 = SeqData "AAAAUUGAAUAUCGUUUUACUUGUUUAUGUC-GUGAAU-UGGCAC-GACGUUUCUACAAGGUG-CCGGAA--CACCUAACAAUAAGUAAGUCAGCAGUGAGAU"
+purine2 = SeqData "AAAAUUUAAUAA-GAAGCACUCAUAUAAUCCCGAGAAUAUGGCUCGGGAGUCUCUACCGAACAACCGUAAAUUGUUCGACUAUGAGUGAAAGUGUACCUAGGG"
+purine3 = SeqData "UGGCAGUAACUAGCGUCACUUCGUAUAACCCCAGUGAUAUGGAUUGGGGGUCUCUACCAGGAACCAAUAA--AUCCUGAUUACGAAGAGUUUAGUGCUUUAGU"
+ss_cons =         ":::::::::::::::::((((((((,,,<<<-<<<_______>>>->>>,,,,,,,,<<<<<<_________>>>>>>,,)))))))):::::::::::::::"
 
 result :: [Stockholm]
 result = [Stockholm file clmn seqs]
@@ -503,26 +501,25 @@ result2 = result ++ result
 returnExc :: a -> Exceptional B.ByteString a
 returnExc = return
 
-test_parseStockholm :: Test
+test_parseStockholm :: Specs
 test_parseStockholm =
-    testGroup "parseStockholm" [
-     testCase "1" $ parseStockholm stockFile  @?= returnExc result,
-     testCase "2" $ parseStockholm stockFile2 @?= returnExc result2]
+    describe "parseStockholm" $ do
+      it "correctly parses test file 1" $ parseStockholm stockFile  @?= returnExc result
+      it "correctly parses test file 2" $ parseStockholm stockFile2 @?= returnExc result2
 
-test_prettyPrintStockholm :: Test
+test_prettyPrintStockholm :: Specs
 test_prettyPrintStockholm =
-    testGroup "parseStockholm/prettyPrintStockholm" [
-     testCase "1" $ parseStockholm (func result)  @?= returnExc result,
-     testCase "2" $ parseStockholm (func result2) @?= returnExc result2]
+    describe "parseStockholm/prettyPrintStockholm" $ do
+      it "parses printed test file 1" $ parseStockholm (func result)  @?= returnExc result
+      it "parses printed test file 2" $ parseStockholm (func result2) @?= returnExc result2
     where func = B.unlines . map prettyPrintStockholm
 #endif
 
 
 #ifdef TEST
-test_Stockholm :: Test
-test_Stockholm = testGroup "Bio.MultiSeq.Stockholm" [
-                  test_parseAnnots,
-                  test_parseStockholm,
-                  test_prettyPrintStockholm
-                 ]
+test_Stockholm :: Specs
+test_Stockholm = describe "Bio.Sequence.Stockholm" $ do
+                   test_parseAnnots
+                   test_parseStockholm
+                   test_prettyPrintStockholm
 #endif

@@ -32,9 +32,22 @@ Library
       -- test-framework >= 0.2 && < 0.4, test-framework-hunit == 0.2.*,
       -- test-framework-quickcheck2 == 0.2.*
 
+Test-suite runtests
+  Type: exitcode-stdio-1.0
+  Hs-Source-Dirs: src
+  Main-is: runtests.hs
+  Other-modules:
+    Bio.Sequence.Stockholm
+  Ghc-Options: -Wall
+  Cpp-Options: -DTEST
+  Build-depends:
+        base               >= 3     && < 5
+      , containers         >= 0.2   && < 0.5
+      , bytestring         == 0.9.*
+      , deepseq            == 1.1.*
+      , explicit-exception == 0.1.*
 
-  -- Modules not exported by this package.
-  -- Other-modules:
+      , biocore            == 0.2.*
 
-  -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
-  -- Build-tools:
+      , hspec              == 0.9.*
+      , HUnit              == 1.2.*
