@@ -1,0 +1,40 @@
+Name:                biostockholm
+Version:             0.1
+Synopsis:            Reading and writing Stockholm files (multiple sequence alignment, used by Rfam and Infernal).
+-- Description:
+License:             BSD3
+License-file:        LICENSE
+Author:              Felipe Lessa
+Maintainer:          felipe.lessa@gmail.com
+Category:            Bioinformatics
+Build-type:          Simple
+
+-- Extra files to be distributed with the package, such as examples or
+-- a README.
+-- Extra-source-files:
+Cabal-version:       >=1.2
+
+
+Library
+  Hs-Source-Dirs: src
+  Exposed-modules:
+    Bio.Sequence.Stockholm
+  Ghc-Options: -Wall
+  Build-depends:
+        base               >= 3     && < 5
+      , containers         >= 0.2   && < 0.5
+      , bytestring         == 0.9.*
+      , deepseq            == 1.1.*
+      , explicit-exception == 0.1.*
+
+      , biocore            == 0.2.*
+      -- HUnit == 1.2.*, QuickCheck == 2.1.*,
+      -- test-framework >= 0.2 && < 0.4, test-framework-hunit == 0.2.*,
+      -- test-framework-quickcheck2 == 0.2.*
+
+
+  -- Modules not exported by this package.
+  -- Other-modules:
+
+  -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
+  -- Build-tools:
