@@ -1,19 +1,25 @@
 Name:                biostockholm
 Version:             0.1
 Synopsis:            Reading and writing Stockholm files (multiple sequence alignment, used by Rfam and Infernal).
--- Description:
 License:             BSD3
 License-file:        LICENSE
 Author:              Felipe Lessa
 Maintainer:          felipe.lessa@gmail.com
 Category:            Bioinformatics
 Build-type:          Simple
-
--- Extra files to be distributed with the package, such as examples or
--- a README.
--- Extra-source-files:
 Cabal-version:       >=1.2
+Description:
+  Parsing and pretty printing of files in Stockholm 1.0 format.  See:
+  .
+  * <http://sonnhammer.sbc.su.se/Stockholm.html>
+  .
+  * <ftp://ftp.sanger.ac.uk/pub/databases/Pfam/current_release/relnotes.txt>
+  .
+  * <http://en.wikipedia.org/wiki/Stockholm_format>
 
+Source-repository head
+  Type:     darcs
+  Location: http://patch-tag.com/r/felipe/biostockholm
 
 Library
   Hs-Source-Dirs: src
