@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP, EmptyDataDecls, DeriveDataTypeable, OverloadedStrings #-}
 
--- | Reading of files in Stockholm 1.0 format. See:
+-- | Parsing and pretty printing of files in Stockholm 1.0
+-- format.  See:
 --
 --    - <http://sonnhammer.sbc.su.se/Stockholm.html>
 --
@@ -43,6 +44,7 @@ import Data.Char (isSpace)
 import Data.List (foldl', find)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
+import Text.Show (showParen, showString)
 
 -- from containers
 import qualified Data.Map as M
@@ -79,7 +81,22 @@ data StockholmSeq = StSeq !SeqLabel
                           !SeqData
                           [Ann SequenceAnnotation]
                           [Ann (ColumnAnnotation InSeq)]
-                    deriving (Show, Eq, Typeable)
+                    deriving (Eq, Typeable)
+
+-- We don't derive Show to be able support biocore-0.1, which
+-- doesn't have Show instances for SeqLabel and SeqData.
+instance Show StockholmSeq where
+    showsPrec prec (StSeq (SeqLabel l) (SeqData d) sa ca) =
+        showParen (prec > 10) $
+          showString "StSeq (SeqLabel " .
+          showsPrec 11 l .
+          showString ") (SeqData " .
+          showsPrec 11 d .
+          (')':) . (' ':) .
+          showsPrec 11 sa .
+          (' ':) .
+          showsPrec 11 ca
+
 
 instance NFData StockholmSeq where
     rnf (StSeq _ _ sa ca) = rnf sa `seq` rnf ca
