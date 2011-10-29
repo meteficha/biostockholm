@@ -7,7 +7,7 @@ Author:              Felipe Lessa
 Maintainer:          felipe.lessa@gmail.com
 Category:            Bioinformatics
 Build-type:          Simple
-Cabal-version:       >=1.2
+Cabal-version:       >=1.8
 Description:
   Parsing and pretty printing of files in Stockholm 1.0 format.  See:
   .
@@ -34,9 +34,6 @@ Library
       , explicit-exception == 0.1.*
 
       , biocore            == 0.2.*
-      -- HUnit == 1.2.*, QuickCheck == 2.1.*,
-      -- test-framework >= 0.2 && < 0.4, test-framework-hunit == 0.2.*,
-      -- test-framework-quickcheck2 == 0.2.*
 
 Test-suite runtests
   Type: exitcode-stdio-1.0
