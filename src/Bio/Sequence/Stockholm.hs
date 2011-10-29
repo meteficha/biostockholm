@@ -255,7 +255,8 @@ test_parseAnnots =
 #endif
 
 
--- | Find an annotation.
+-- | Find an annotation.  For example, you may use @'findAnn' 'SS'@
+-- to find the secondary of an Stockholm file.
 findAnn :: Eq d => d -> [Ann d] -> Maybe ByteString
 findAnn x = fmap text . find ((== x) . feature)
 
@@ -342,14 +343,21 @@ parseSeqData str = case B.words str of
                      _ -> throw (malformedSeqDataExc str)
 
 
--- | @parseStockholm lines@ parses a file in Stockholm 1.0 format.
---   The file must be completely read before it is used because
+-- | @parseStockholm@ parses a file in Stockholm 1.0 format.
+--
+--   Each file must be completely read before it is used because
 --   the Stockholm format allows information to be given in any
---   part of the file.  If there are multiple families in the same
---   file, the file only needs to be read until the \"//\" mark is found.
+--   part of the file.  However, there may be multiple
+--   \"Stockholm files\" concatenated in a single \"filesystem
+--   file\".  These multiple files are read independently, which
+--   is why we return a list of 'Exceptional'@s@.
+--
+--   If you prefer to read the whole file in one go, use
+--   @'sequence' (parseStockholm input)@, which will fail if any
+--   family fails.
 parseStockholm :: (StockholmExc e) => ByteString
-               -> Exceptional e [Stockholm]
-parseStockholm = mapM parseStockholm' . split .
+               -> [Exceptional e Stockholm]
+parseStockholm = map parseStockholm' . split .
                  filter (not . B.all isSpace) . B.lines
     where
       split [] = []
