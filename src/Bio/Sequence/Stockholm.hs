@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, EmptyDataDecls, DeriveDataTypeable, OverloadedStrings #-}
+{-# LANGUAGE BangPatterns, CPP, EmptyDataDecls, DeriveDataTypeable, OverloadedStrings #-}
 
 -- | Parsing and pretty printing of files in Stockholm 1.0
 -- format.  See:
@@ -41,10 +41,9 @@ import Control.Arrow (second)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (mplus)
 import Data.Char (isSpace)
-import Data.List (foldl', find)
+import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
-import Text.Show (showParen, showString)
 
 -- from containers
 import qualified Data.Map as M
@@ -327,8 +326,12 @@ instance StockholmExc ByteString where
 
 
 
--- | Type (F, C, S or R), corresponding sequence, name and data.
-type ParseAnnRet = ((Char, Maybe SeqLabel, ByteString), ByteString)
+-- | Some kind of annotation
+data ParseAnnRet =
+    FileAnn    !(Ann FileAnnotation)
+  | FileColAnn !(Ann (ColumnAnnotation InFile))
+  | SeqAnn     !ByteString !(Ann SequenceAnnotation)
+  | SeqColAnn  !ByteString !(Ann (ColumnAnnotation InSeq))
 
 -- | @parseAnnotation line@ tries to parse a line as an annotation.
 parseAnnotation :: (StockholmExc e) => ByteString -> Exceptional e ParseAnnRet
@@ -339,14 +342,12 @@ parseAnnotation line =
   let Just (typ, rest) = B.uncons $ B.drop 3 line
       (word1, text1) = second dropSpace . B.break isSpace $ dropSpace rest
       (word2, text2) = second dropSpace . B.break isSpace $ text1
-      global = ((typ, Nothing,               word1), text1)
-      seqspe = ((typ, Just (SeqLabel word1), word2), text2)
   in case typ of
-       'F' -> return global
-       'C' -> return global
-       'S' -> return seqspe
-       'R' -> return seqspe
-       _ -> throw (unknownAnnTypeExc typ)
+       'F' -> return $ FileAnn    (parseAnn' word1 text1)
+       'C' -> return $ FileColAnn (parseAnn' word1 text1)
+       'S' -> return $ SeqAnn    word1 (parseAnn' word2 text2)
+       'R' -> return $ SeqColAnn word1 (parseAnn' word2 text2)
+       _   -> throw (unknownAnnTypeExc typ)
 
 dropSpace :: ByteString -> ByteString
 dropSpace = B.dropWhile isSpace
@@ -378,8 +379,9 @@ parseStockholm = map parseStockholm' . split .
                  filter (not . B.all isSpace) . B.lines
     where
       split [] = []
-      split xs = case break (B.isPrefixOf "//") xs of
-                   (y, ys) -> y : split (tail ys)
+      split xs = let ~(y, ys) = break (B.isPrefixOf "//") xs
+                 in y : split (tail ys)
+
 
 parseStockholm' :: (StockholmExc e) => [ByteString]
                 -> Exceptional e Stockholm
@@ -387,65 +389,87 @@ parseStockholm' = header . filter (not . B.null)
     where
       -- Find
       header (h:hs)
-          | h == stockholm = do (annots,seqs) <- go initial hs
+          | h == stockholm = do (annots, seqs) <- go (emptyPA, M.empty) hs
                                 return (makeStockholm annots seqs)
           | otherwise      = throw headerExc
           where stockholm = "# STOCKHOLM 1.0"
-                initial   = (M.empty, M.empty)
       header [] = throw emptyFileExc
 
       -- End of file
       go acc [] = return acc
 
       -- Annotation
-      go (annots,seqs) (line:ls) | B.take 2 line == "#=" = do
+      go (!annots, !seqs) (line:ls) | B.take 2 line == "#=" = do
         annot <- parseAnnotation line
-        go (insertDM annot annots, seqs) ls
+        go (insertPA annot annots, seqs) ls
 
       -- Comment
-      go (annots,seqs) (l:ls) | B.head l == '#' =
-        go (annots,seqs) ls
+      go acc (l:ls) | B.head l == '#' = go acc ls
 
       -- Otherwise a sequence
-      go (annots,seqs) (line:ls) = do
+      go (!annots, !seqs) (line:ls) = do
         seqData <- parseSeqData line
         go (annots, insertDM seqData seqs) ls
 
 
-type DiffMap a b = M.Map a ([b] -> [b])
+type DiffMap a b = M.Map a [b]
 
-insertDM :: Ord a => (a,b) -> DiffMap a b -> DiffMap a b
-insertDM (key,val) = M.insertWith (flip (.)) key (val:)
+insertDM :: Ord a => (a, b) -> DiffMap a b -> DiffMap a b
+insertDM (key, val) = M.insertWith' (\_ old -> val:old) key [val]
 
 finishDM :: (b -> ByteString) -> DiffMap a b -> M.Map a ByteString
-finishDM f = fmap (B.concat . map f . ($ []))
+finishDM f = fmap (B.concat . map f . reverse)
+
+type AnnMap d = DiffMap d ByteString
+
+insertAnn :: Ord d => Ann d -> AnnMap d -> AnnMap d
+insertAnn (Ann key val) = insertDM (key, val)
+
+finishAnn :: AnnMap d -> [Ann d]
+finishAnn m = [Ann a b | (a, b) <- M.toList (finishDM id m)]
+
+type SeqAnnMap d = M.Map ByteString (AnnMap d)
+
+insertSM :: Ord d => ByteString -> Ann d -> SeqAnnMap d -> SeqAnnMap d
+insertSM sq ann = M.alter (just . insertAnn ann . fromMaybe M.empty) sq
+    where
+      just !x = Just x
+
+finishSM :: SeqAnnMap d -> M.Map ByteString [Ann d]
+finishSM = fmap finishAnn
+
+data PartialAnns =
+    PartialAnns { paFileAnns    :: !(AnnMap FileAnnotation)
+                , paFileColAnns :: !(AnnMap (ColumnAnnotation InFile))
+                , paSeqAnns     :: !(SeqAnnMap SequenceAnnotation)
+                , paSeqColAnns  :: !(SeqAnnMap (ColumnAnnotation InSeq))
+                }
+
+emptyPA :: PartialAnns
+emptyPA = PartialAnns M.empty M.empty M.empty M.empty
+
+insertPA :: ParseAnnRet -> PartialAnns -> PartialAnns
+insertPA (FileAnn      ann) pa = pa { paFileAnns    = insertAnn ann (paFileAnns pa)     }
+insertPA (FileColAnn   ann) pa = pa { paFileColAnns = insertAnn ann (paFileColAnns pa)  }
+insertPA (SeqAnn    sq ann) pa = pa { paSeqAnns     = insertSM sq ann (paSeqAnns pa)    }
+insertPA (SeqColAnn sq ann) pa = pa { paSeqColAnns  = insertSM sq ann (paSeqColAnns pa) }
+
+
 
 -- | Glue everything in place, as the Stockholm format lets
 --   everything be everywhere and split in any number of parts.
-makeStockholm :: DiffMap (Char, Maybe SeqLabel, ByteString) ByteString
-              -> DiffMap SeqLabel SeqData -> Stockholm
-makeStockholm annotsDM seqsDM =
-    let annots = finishDM id   annotsDM
-        seqs   = finishDM unSD seqsDM
+makeStockholm :: PartialAnns -> DiffMap SeqLabel SeqData -> Stockholm
+makeStockholm annots seqsDM =
+    let fileAnns_   = finishAnn (paFileAnns    annots)
+        fileColAnns = finishAnn (paFileColAnns annots)
+        seqAnns_    = finishSM  (paSeqAnns     annots)
+        seqColAnns  = finishSM  (paSeqColAnns  annots)
 
-        -- Separate the global from the sequence annotations
-        go ('F', Nothing, feat) txt (f,c,r) = (parseAnn' feat txt:f,c,r)
-        go ('C', Nothing, feat) txt (f,c,r) = (f,parseAnn' feat txt:c,r)
-        go (typ, Just sq, feat) txt (f,c,r) = (f,c,(typ,sq,feat,txt):r)
-        go _ _ _ = error "makeStockholm: not here, ever"
-
-        -- Separate the sequence annotations to each annotation
-        add ('S',sq,feat,txt) = flip M.adjust sq $ \(StSeq sl sd sa ca) ->
-                                  StSeq sl sd (parseAnn' feat txt : sa) ca
-        add ('R',sq,feat,txt) = flip M.adjust sq $ \(StSeq sl sd sa ca) ->
-                                  StSeq sl sd sa (parseAnn' feat txt : ca)
-        add _ = error "makeStockholm: not here either"
-
-        -- Glue everything
-        (file, clmn, rest) = M.foldWithKey go ([],[],[]) annots
-        plainseqs = M.mapWithKey (\k s -> StSeq k (SeqData s) [] []) seqs
-    in Stockholm file clmn (M.elems $ foldl' (flip add) plainseqs rest)
-
+        stseqs = [StSeq label (SeqData dt) (f sq seqAnns_) (f sq seqColAnns)
+                   | (label@(SeqLabel sq), dt) <- M.toList (finishDM unSD seqsDM)]
+            where
+              f = M.findWithDefault []
+    in Stockholm fileAnns_ fileColAnns stseqs
 
 
 
