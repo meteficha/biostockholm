@@ -547,8 +547,8 @@ stockFile2 = B.unlines [stockFile, stockFile]
 result2 :: [Stockholm]
 result2 = result ++ result
 
-returnExc :: a -> Exceptional B.ByteString a
-returnExc = return
+returnExc :: [a] -> [Exceptional B.ByteString a]
+returnExc = map return
 
 test_parseStockholm :: Specs
 test_parseStockholm =
