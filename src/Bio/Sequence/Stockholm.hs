@@ -49,7 +49,7 @@ import Data.Typeable (Typeable)
 import qualified Data.Map as M
 
 -- from bytestring
-import qualified Data.ByteString.Lazy.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as L
 import Data.ByteString.Lazy.Char8 (ByteString)
 
 -- from biocore
@@ -103,7 +103,7 @@ instance NFData StockholmSeq where
 instance BioSeq StockholmSeq where
     seqlabel  (StSeq sl _ _ _) = sl
     seqdata   (StSeq _ sd _ _) = sd
-    seqlength (StSeq _ sd _ _) = Offset $ B.length (unSD sd)
+    seqlength (StSeq _ sd _ _) = Offset $ L.length (unSD sd)
 
 -- | A generic annotation.
 data Ann d = Ann { feature :: !d
@@ -230,13 +230,13 @@ instance ClmnAnnLoc a => IsAnnotation (ColumnAnnotation a) where
         where
           removeSuffix feat phantom =
               let suffix = clmnAnnSuffix phantom
-                  (f, s) = B.splitAt (B.length feat - B.length suffix) feat
+                  (f, s) = L.splitAt (L.length feat - L.length suffix) feat
               in if suffix == s then f else ""
     showAnn = mkShowAnn addSuffix clmnAnns f
         where
           f (C_Other o) = Just o
           f _           = Nothing
-          addSuffix feat phantom = feat `B.append` clmnAnnSuffix phantom
+          addSuffix feat phantom = feat `L.append` clmnAnnSuffix phantom
 
 clmnAnns :: [(ByteString, ColumnAnnotation a)]
 clmnAnns = [("AS",AS), ("IN",IN), ("LI",LI), ("PAS",PAS), ("PP",PP),
@@ -305,11 +305,11 @@ instance StockholmExc ByteString where
     emptyFileExc = "parseStockholm: empty file."
     headerExc = "parseStockholm: header is missing."
     malformedAnnExc line =
-        B.concat ["parseStockholm: malformed annotation '", line, "'."]
+        L.concat ["parseStockholm: malformed annotation '", line, "'."]
     unknownAnnTypeExc typ =
-        B.concat ["parseStockholm: unknown annotation type '", B.pack [typ], "'."]
+        L.concat ["parseStockholm: unknown annotation type '", L.pack [typ], "'."]
     malformedSeqDataExc line =
-        B.concat ["parseStockholm: malformed sequence data line '", line, "'."]
+        L.concat ["parseStockholm: malformed sequence data line '", line, "'."]
 
 
 
@@ -336,12 +336,12 @@ data ParseAnnRet =
 -- | @parseAnnotation line@ tries to parse a line as an annotation.
 parseAnnotation :: (StockholmExc e) => ByteString -> Exceptional e ParseAnnRet
 parseAnnotation line
-    | not (B.isPrefixOf "#=G" line) || B.length line < 5 =
+    | not (L.isPrefixOf "#=G" line) || L.length line < 5 =
         throw (malformedAnnExc line)
 parseAnnotation line =
-  let Just (typ, rest) = B.uncons $ B.drop 3 line
-      (word1, text1) = second dropSpace . B.break isSpace $ dropSpace rest
-      (word2, text2) = second dropSpace . B.break isSpace $ text1
+  let Just (typ, rest) = L.uncons $ L.drop 3 line
+      (word1, text1) = second dropSpace . L.break isSpace $ dropSpace rest
+      (word2, text2) = second dropSpace . L.break isSpace $ text1
   in case typ of
        'F' -> return $ FileAnn    (parseAnn' word1 text1)
        'C' -> return $ FileColAnn (parseAnn' word1 text1)
@@ -350,13 +350,13 @@ parseAnnotation line =
        _   -> throw (unknownAnnTypeExc typ)
 
 dropSpace :: ByteString -> ByteString
-dropSpace = B.dropWhile isSpace
+dropSpace = L.dropWhile isSpace
 
 
 -- | @parseSeqData line@ tries to parse a line as some data of a sequence.
 parseSeqData :: (StockholmExc e) => ByteString
              -> Exceptional e (SeqLabel, SeqData)
-parseSeqData str = case B.words str of
+parseSeqData str = case L.words str of
                      [ident, sq] -> return (SeqLabel ident, SeqData sq)
                      _ -> throw (malformedSeqDataExc str)
 
@@ -376,16 +376,16 @@ parseSeqData str = case B.words str of
 parseStockholm :: (StockholmExc e) => ByteString
                -> [Exceptional e Stockholm]
 parseStockholm = map parseStockholm' . split .
-                 filter (not . B.all isSpace) . B.lines
+                 filter (not . L.all isSpace) . L.lines
     where
       split [] = []
-      split xs = let ~(y, ys) = break (B.isPrefixOf "//") xs
+      split xs = let ~(y, ys) = break (L.isPrefixOf "//") xs
                  in y : split (tail ys)
 
 
 parseStockholm' :: (StockholmExc e) => [ByteString]
                 -> Exceptional e Stockholm
-parseStockholm' = header . filter (not . B.null)
+parseStockholm' = header . filter (not . L.null)
     where
       -- Find
       header (h:hs)
@@ -399,12 +399,12 @@ parseStockholm' = header . filter (not . B.null)
       go acc [] = return acc
 
       -- Annotation
-      go (!annots, !seqs) (line:ls) | B.take 2 line == "#=" = do
+      go (!annots, !seqs) (line:ls) | L.take 2 line == "#=" = do
         annot <- parseAnnotation line
         go (insertPA annot annots, seqs) ls
 
       -- Comment
-      go acc (l:ls) | B.head l == '#' = go acc ls
+      go acc (l:ls) | L.head l == '#' = go acc ls
 
       -- Otherwise a sequence
       go (!annots, !seqs) (line:ls) = do
@@ -418,7 +418,7 @@ insertDM :: Ord a => (a, b) -> DiffMap a b -> DiffMap a b
 insertDM (key, val) = M.insertWith' (\_ old -> val:old) key [val]
 
 finishDM :: (b -> ByteString) -> DiffMap a b -> M.Map a ByteString
-finishDM f = fmap (B.concat . map f . reverse)
+finishDM f = fmap (L.concat . map f . reverse)
 
 type AnnMap d = DiffMap d ByteString
 
@@ -475,13 +475,13 @@ makeStockholm annots seqsDM =
 
 -- | Pretty-prints an Stockholm file.  We follow Rfam preferences
 -- and do not wrap lines.
-prettyPrintStockholm :: Stockholm -> B.ByteString
+prettyPrintStockholm :: Stockholm -> L.ByteString
 prettyPrintStockholm (Stockholm file clmn seqs) =
     let showAnnF :: IsAnnotation a => Char -> Ann a -> (ByteString, ByteString)
-        showAnnF t ann = (B.concat [B.pack ("#=G" ++ t : " "),
+        showAnnF t ann = (L.concat [L.pack ("#=G" ++ t : " "),
                                     showAnn (feature ann)], text ann)
         showAnnS :: IsAnnotation a => ByteString -> Char -> Ann a -> (ByteString, ByteString)
-        showAnnS s t ann = (B.unwords [B.pack ("#=G" ++ [t]), s,
+        showAnnS s t ann = (L.unwords [L.pack ("#=G" ++ [t]), s,
                                        showAnn (feature ann)], text ann)
 
         fileLines = map (showAnnF 'F') file
@@ -492,16 +492,16 @@ prettyPrintStockholm (Stockholm file clmn seqs) =
                       ++ map (showAnnS name 'S') sa
 
         allLines    = fileLines ++ sequences ++ clmnLines
-        firstColLen = maximum $ map (B.length . fst) allLines
-        mkLine (col1, col2) = B.concat [col1, B.replicate n ' ', col2]
-            where n = 1 + firstColLen - B.length col1
-    in B.unlines ("# STOCKHOLM 1.0" : map mkLine allLines ++ ["//"])
+        firstColLen = maximum $ map (L.length . fst) allLines
+        mkLine (col1, col2) = L.concat [col1, L.replicate n ' ', col2]
+            where n = 1 + firstColLen - L.length col1
+    in L.unlines ("# STOCKHOLM 1.0" : map mkLine allLines ++ ["//"])
 
 
 
 #ifdef TEST
-stockFile :: B.ByteString
-stockFile = B.unlines [
+stockFile :: L.ByteString
+stockFile = L.unlines [
   "# STOCKHOLM 1.0",
   "#=GF AU Infernal 1.0",
   "",
@@ -541,13 +541,13 @@ result = [Stockholm file clmn seqs]
               mkStock "Purine3" purine3 []]
       mkStock name data_ sa = StSeq name data_ sa []
 
-stockFile2 :: B.ByteString
-stockFile2 = B.unlines [stockFile, stockFile]
+stockFile2 :: L.ByteString
+stockFile2 = L.unlines [stockFile, stockFile]
 
 result2 :: [Stockholm]
 result2 = result ++ result
 
-returnExc :: [a] -> [Exceptional B.ByteString a]
+returnExc :: [a] -> [Exceptional L.ByteString a]
 returnExc = map return
 
 test_parseStockholm :: Specs
@@ -561,7 +561,7 @@ test_prettyPrintStockholm =
     describe "parseStockholm/prettyPrintStockholm" $ do
       it "parses printed test file 1" $ parseStockholm (func result)  @?= returnExc result
       it "parses printed test file 2" $ parseStockholm (func result2) @?= returnExc result2
-    where func = B.unlines . map prettyPrintStockholm
+    where func = L.unlines . map prettyPrintStockholm
 #endif
 
 
