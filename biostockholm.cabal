@@ -1,5 +1,5 @@
 Name:                biostockholm
-Version:             0.1.0.1
+Version:             0.1.0.2
 Synopsis:            Reading and writing Stockholm files (multiple sequence alignment, used by Rfam and Infernal).
 License:             BSD3
 License-file:        LICENSE
@@ -30,7 +30,7 @@ Library
         base               >= 3     && < 5
       , containers         >= 0.2   && < 0.5
       , bytestring         == 0.9.*
-      , deepseq            == 1.1.*
+      , deepseq            >= 1.1   && < 1.3
       , explicit-exception == 0.1.*
 
       , biocore            >= 0.1   && < 0.3
@@ -47,7 +47,7 @@ Test-suite runtests
         base               >= 3     && < 5
       , containers         >= 0.2   && < 0.5
       , bytestring         == 0.9.*
-      , deepseq            == 1.1.*
+      , deepseq            >= 1.1   && < 1.3
       , explicit-exception == 0.1.*
 
       , biocore            >= 0.1   && < 0.3
