@@ -5,6 +5,9 @@ import Control.Applicative
 import Data.List (sort)
 import System.IO.Unsafe (unsafePerformIO)
 
+-- from containers
+import qualified Data.Map as M
+
 -- from bytestring
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -57,6 +60,14 @@ main =
           again    <- strictParse  rendered
           return (canonical again == canonical sto)
 
+    describe "parseEvents/renderEvents" $ do
+      prop "passes QuickCheck property" $ \events ->
+        unsafePerformIO $ do
+          rendered <- C.runResourceT $ CL.sourceList events   C.$$ renderEvents C.=$ CL.consume
+          again    <- C.runResourceT $ CL.sourceList rendered C.$$ parseEvents C.=$ CL.consume
+          return (canonical again == canonical events)
+
+
 
 ----------------------------------------------------------------------
 
@@ -108,9 +119,12 @@ stockFile2 = L.unlines [stockFile, stockFile]
 result2 :: [Stockholm]
 result2 = result ++ result
 
+sourceLBS :: C.Resource m => L.ByteString -> C.Source m B.ByteString
+sourceLBS = CL.sourceList . L.toChunks
+
 strictParse :: L.ByteString -> IO [Stockholm]
 strictParse lbs = C.runResourceT $
-                    CL.sourceList (L.toChunks lbs) C.$=
+                    sourceLBS lbs C.$=
                     parseStockholm C.$$
                     CL.consume
 
@@ -130,12 +144,16 @@ instance Arbitrary Event where
       [ (1,  pure EvHeader)
       , (1,  pure EvEnd)
       , (3,  EvComment <$> arbitrary)
-      , (10, EvSeqData <$> arbitrary <*> arbitrary)
-      , (2,  EvGF      <$> arbitrary <*> arbitrary)
-      , (2,  EvGC      <$> arbitrary <*> arbitrary)
-      , (2,  EvGS      <$> arbitrary <*> arbitrary <*> arbitrary)
-      , (2,  EvGR      <$> arbitrary <*> arbitrary <*> arbitrary)
+      , (10, EvSeqData <$> seqlabel <*> seqdata)
+      , (2,  EvGF      <$> feature <*> arbitrary)
+      , (2,  EvGC      <$> feature <*> arbitrary)
+      , (2,  EvGS      <$> seqlabel <*> feature <*> arbitrary)
+      , (2,  EvGR      <$> seqlabel <*> feature <*> arbitrary)
       ]
+        where seqlabel = strict . unSL <$> arbitrary
+              seqdata  = strict . unSD <$> arbitrary
+              feature  = B.pack <$> listOf1 (elements alpha)
+              strict = B.concat . L.toChunks
 
 instance Arbitrary Stockholm where
     arbitrary = Stockholm <$> arbitrary <*> arbitrary <*> arbitrary
@@ -173,26 +191,34 @@ annArbitraryHelper list other =
               [(5, pure x) | x <- list]
 
 instance Arbitrary SeqLabel where
-    arbitrary = SeqLabel <$> (L.cons <$> arbitrary <*> arbitrary)
+    arbitrary = SeqLabel <$> (L.cons <$> elements alpha <*> (L.filter (/= ' ') <$> arbitrary))
 
 instance Arbitrary SeqData where
     arbitrary = SeqData . L.pack <$> listOf1 (elements ['A', 'T', 'C', 'G'])
 
 instance Arbitrary B.ByteString where
-    arbitrary = B.pack <$> listOf1 (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ " .?!|:[]{}")
+    arbitrary = B.pack <$> (c3 <$> elements alpha
+                               <*> listOf1 (elements $ alpha ++ " .?!|:[]{}")
+                               <*> elements alpha)
+        where c3 a b c = a : b ++ [c]
 
 instance Arbitrary L.ByteString where
     arbitrary = L.fromChunks <$> arbitrary
 
+alpha :: String
+alpha = ['a'..'z'] ++ ['A'..'Z']
+
 
 ----------------------------------------------------------------------
 
-class Canonical a where
+class Ord a => Canonical a where
     canonical :: a -> a
     canonical = id
 
+    canonicalList :: [a] -> [a]
+    canonicalList = sort . map canonical
+
 instance Canonical Event where
-instance Canonical (Ann d) where
 instance Canonical FileAnnotation where
 instance Canonical (ColumnAnnotation a) where
 instance Canonical SequenceAnnotation where
@@ -209,5 +235,12 @@ instance Canonical StockholmSeq where
     canonical (StSeq label data_ seqanns clmnanns) =
         StSeq (canonical label) (canonical data_) (canonical seqanns) (canonical clmnanns)
 
-instance Ord a => Canonical [a] where
-    canonical = sort
+instance (Ord a, Canonical a) => Canonical [a] where
+    canonical = canonicalList
+
+instance Ord d => Canonical (Ann d) where
+    canonicalList = map mk . M.toList . toMap . map unMk
+        where
+          mk = uncurry Ann
+          unMk (Ann f d) = (f, d)
+          toMap = M.fromListWith (flip L.append)

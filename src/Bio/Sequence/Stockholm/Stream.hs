@@ -56,43 +56,46 @@ data Event = EvHeader
 
 -- | Parse an 'Event'.
 eventParser :: A.Parser Event
-eventParser = (hash *> (header
-                    <|> ann
-                    <|> comment)
-           <|> end
-           <|> seqdata) <* skipTillNextLine
+eventParser = hash *> (ann
+                   <|> header
+                   <|> comment)
+          <|> end
+          <|> seqdata
     where
       spaces = A.skipWhile A8.isHorizontalSpace
-      word   = A.takeTill A8.isSpace_w8 <* spaces
-      skipTillNextLine = A.skipWhile (not . A8.isEndOfLine) <* some A8.endOfLine
-      tillNextLine     = A.takeTill A8.isEndOfLine
+      word   = A.takeTill  A8.isHorizontalSpace <* spaces
+      tillNextLine = A.takeTill A8.isEndOfLine <* A8.endOfLine
+      nextLine     = spaces <* A8.endOfLine
 
       hash    = A8.char '#'
-      header  = EvHeader  <$  spaces <* A8.string "STOCKHOLM 1.0"
+      header  = EvHeader  <$  spaces <* mystring "STOCKHOLM 1.0" <* nextLine
       comment = EvComment <$> tillNextLine
-      end     = EvEnd     <$  A8.string "//"
+      end     = EvEnd     <$  A8.string "//" <* nextLine
       seqdata = EvSeqData <$> word <*> tillNextLine
+
+      mystring (x:xs) = A8.char x *> mystring xs
+      mystring []     = pure ()
 
       ann = A8.string "=G" *> (gf <|> gc <|> gs <|> gr)
           where
-            gf = EvGF <$ A8.string "F" <* spaces          <*> word <*> tillNextLine
-            gc = EvGC <$ A8.string "C" <* spaces          <*> word <*> tillNextLine
-            gs = EvGS <$ A8.string "S" <* spaces <*> word <*> word <*> tillNextLine
-            gr = EvGR <$ A8.string "R" <* spaces <*> word <*> word <*> tillNextLine
+            gf = EvGF <$ A8.char 'F' <* spaces          <*> word <*> tillNextLine
+            gc = EvGC <$ A8.char 'C' <* spaces          <*> word <*> tillNextLine
+            gs = EvGS <$ A8.char 'S' <* spaces <*> word <*> word <*> tillNextLine
+            gr = EvGR <$ A8.char 'R' <* spaces <*> word <*> word <*> tillNextLine
 
 
 
 -- | Conduit that parses a file into events.
 parseEvents :: C.ResourceThrow m => C.Conduit B.ByteString m Event
-parseEvents = C.sequenceSink False go
+parseEvents = C.sequenceSink () go
     where
-      go False = CB.dropWhile A8.isSpace_w8 >> go True
-      go True  = do
+      go _ = do
+        CB.dropWhile A8.isSpace_w8
         mevent <- sinkParser $     Nothing <$  A8.endOfInput
                                <|> Just    <$> eventParser
         return $ case mevent of
                    Nothing    -> C.Stop
-                   Just event -> C.Emit True [event]
+                   Just event -> C.Emit () [event]
 
 
 -- | Pretty print an event.
