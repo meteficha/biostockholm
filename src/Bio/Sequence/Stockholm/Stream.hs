@@ -64,8 +64,8 @@ eventParser = (hash *> (header
     where
       spaces = A.skipWhile A8.isHorizontalSpace
       word   = A.takeTill A8.isSpace_w8 <* spaces
-      skipTillNextLine = spaces <*  some A8.endOfLine
-      tillNextLine     = spaces  *> A.takeTill A8.isEndOfLine
+      skipTillNextLine = A.skipWhile (not . A8.isEndOfLine) <* some A8.endOfLine
+      tillNextLine     = A.takeTill A8.isEndOfLine
 
       hash    = A8.char '#'
       header  = EvHeader  <$  spaces <* A8.string "STOCKHOLM 1.0"
