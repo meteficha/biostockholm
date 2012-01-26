@@ -130,6 +130,6 @@ eventPrinter ev =
           n = bs "\n"
 
 
--- | Conduit the pretty prints an event stream into a file.
+-- | Conduit that pretty prints an event stream into a file.
 renderEvents :: C.ResourceUnsafeIO m => C.Conduit Event m B.ByteString
 renderEvents = CL.map eventPrinter C.=$= builderToByteString
