@@ -101,7 +101,7 @@ eventPrinter ev =
     case ev of
       EvHeader                    -> bs "# STOCKHOLM 1.0\n"
       EvEnd                       -> bs "//\n"
-      EvComment comment           -> bs "#" <> bs comment
+      EvComment comment           -> bs "#" <> bs comment <> n
       EvSeqData seqlabel seqdata  -> bs seqlabel <> s <> bs seqdata <> n
       EvGF          feature data_ -> bs "#=GF " <> bs feature  <> s <> bs data_ <> n
       EvGC          feature data_ -> bs "#=GC " <> bs feature  <> s <> bs data_ <> n
