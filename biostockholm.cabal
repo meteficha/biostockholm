@@ -51,6 +51,7 @@ Test-suite runtests
       , containers         >= 0.2   && < 0.5
       , bytestring         == 0.9.*
       , conduit            == 0.1.*
+      , zlib-conduit
       , transformers       >= 0.2
 
       , biocore            >= 0.1   && < 0.3

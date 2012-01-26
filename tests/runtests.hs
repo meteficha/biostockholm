@@ -26,6 +26,9 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Lazy as CZ
 import qualified Data.Conduit.List as CL
 
+-- from zlib-conduit
+import Data.Conduit.Zlib (ungzip)
+
 -- from QuickCheck
 import Test.QuickCheck
 
@@ -67,9 +70,15 @@ main =
           again    <- strictParse  rendered
           return (canonical again == canonical sto)
 
+    describe "parseEvents" $ do
+      it "is able to parse gzipped RFAM_FULL" $ do
+        rfamFp <- getEnv "RFAM_FULL"
+        C.runResourceT $
+          CB.sourceFile rfamFp C.$$ ungzip C.=$ parseEvents C.=$ CL.sinkNull
+
     describe "parseStockholm/renderStockholm/parseStockholm" $ do
-      it "roundtrips RFAM" $ do
-        rfamFp <- getEnv "RFAM"
+      it "roundtrips RFAM_SEED" $ do
+        rfamFp <- getEnv "RFAM_SEED"
         C.runResourceT $ do
           parsed1 <- CZ.lazyConsume $ CB.sourceFile rfamFp C.$= parseStockholm
           parsed2 <- CZ.lazyConsume $ CL.sourceList parsed1 C.$= renderStockholm C.$= parseStockholm
