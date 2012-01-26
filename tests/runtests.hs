@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 
 -- from base
 import Control.Applicative
@@ -45,7 +45,7 @@ main =
         ret <- strictParse stockFile2
         ret @?= result2
 
-    describe "parseStockholm/renderStockholm" $ do
+    describe "renderStockholm/parseStockholm" $ do
       it "parses rendered test file 1" $ do
         rendered <- strictRender result
         again    <- strictParse  rendered
@@ -54,18 +54,37 @@ main =
         rendered <- strictRender result2
         again    <- strictParse  rendered
         again @?= result2
-      prop "passes QuickCheck property" $ \sto ->
+      prop "passes QuickCheck property" $ \(sto :: [Stockholm]) ->
         unsafePerformIO $ do
           rendered <- strictRender sto
           again    <- strictParse  rendered
           return (canonical again == canonical sto)
 
-    describe "parseEvents/renderEvents" $ do
-      prop "passes QuickCheck property" $ \events ->
+    describe "renderEvents/parseEvents" $ do
+      prop "passes QuickCheck property" $ \(events :: [Event]) ->
         unsafePerformIO $ do
           rendered <- C.runResourceT $ CL.sourceList events   C.$$ renderEvents C.=$ CL.consume
           again    <- C.runResourceT $ CL.sourceList rendered C.$$ parseEvents C.=$ CL.consume
           return (canonical again == canonical events)
+
+    -- -- Needs a better Arbitrary instance for [Event], since
+    -- -- eventList may generate, for example, annotations for
+    -- -- sequences that don't exist.
+    -- describe "parseDoc/renderDoc" $ do
+    --   prop "passes QuickCheck property" $ forAll eventList $ \(events :: [Event]) ->
+    --     unsafePerformIO $ do
+    --       rendered <- C.runResourceT $ CL.sourceList events   C.$$ parseDoc  C.=$ CL.consume
+    --       again    <- C.runResourceT $ CL.sourceList rendered C.$$ renderDoc C.=$ CL.consume
+    --       return (canonical again == canonical events)
+
+    describe "renderDoc/parseDoc" $ do
+      prop "passes QuickCheck property" $ \(docs :: [Stockholm]) ->
+        unsafePerformIO $ do
+          rendered <- C.runResourceT $ CL.sourceList docs     C.$$ renderDoc C.=$ CL.consume
+          again    <- C.runResourceT $ CL.sourceList rendered C.$$ parseDoc  C.=$ CL.consume
+          return (canonical again == canonical docs)
+
+
 
 
 
@@ -141,9 +160,7 @@ strictRender stos = fmap L.fromChunks $
 
 instance Arbitrary Event where
     arbitrary = frequency
-      [ (1,  pure EvHeader)
-      , (1,  pure EvEnd)
-      , (3,  EvComment <$> arbitrary)
+      [ (3,  EvComment <$> arbitrary)
       , (10, EvSeqData <$> seqlabel <*> seqdata)
       , (2,  EvGF      <$> feature <*> arbitrary)
       , (2,  EvGC      <$> feature <*> arbitrary)
@@ -155,8 +172,15 @@ instance Arbitrary Event where
               feature  = B.pack <$> listOf1 (elements alpha)
               strict = B.concat . L.toChunks
 
+eventList :: Gen [Event]
+eventList = sized $ \s -> frequency [ (100, single)
+                                    , (s, (++) <$> single <*> (resize (s `div` 2) eventList)) ]
+    where
+      single = (\xs -> EvHeader : xs ++ [EvEnd]) <$> listOf arbitrary
+
 instance Arbitrary Stockholm where
-    arbitrary = Stockholm <$> arbitrary <*> arbitrary <*> arbitrary
+    arbitrary = sized $ \s -> resize (min s 15) $
+                Stockholm <$> arbitrary <*> arbitrary <*> arbitrary
     shrink (Stockholm fileanns clmnanns stseqs) =
         Stockholm <$> shrink fileanns <*> shrink clmnanns <*> shrink stseqs
 
@@ -218,7 +242,6 @@ class Ord a => Canonical a where
     canonicalList :: [a] -> [a]
     canonicalList = sort . map canonical
 
-instance Canonical Event where
 instance Canonical FileAnnotation where
 instance Canonical (ColumnAnnotation a) where
 instance Canonical SequenceAnnotation where
@@ -226,6 +249,30 @@ instance Canonical SeqLabel where
 instance Canonical SeqData where
 instance Canonical B.ByteString where
 instance Canonical L.ByteString where
+
+instance Canonical Event where
+    canonicalList = concat . map (glue . sort) . separate
+        where
+          separate (EvHeader : xs) =
+              case break (== EvEnd) xs of
+                (before, EvEnd : after) -> (EvHeader : before ++ [EvEnd]) : separate after
+                (before, rest)          -> (EvHeader : before)            : separate rest
+          separate (x:xs) = [x] : separate xs
+          separate []     = []
+          (<>) = B.append
+          glue (EvSeqData sq1 data1 : EvSeqData sq2 data2 : xs)
+              | sq1 == sq2 = glue (EvSeqData sq1 (data1 <> data2) : xs)
+          glue (EvGF feat1 data1 : EvGF feat2 data2 : xs)
+              | feat1 == feat2 = glue (EvGF feat1 (data1 <> data2) : xs)
+          glue (EvGC feat1 data1 : EvGC feat2 data2 : xs)
+              | feat1 == feat2 = glue (EvGC feat1 (data1 <> data2) : xs)
+          glue (EvGS sq1 feat1 data1 : EvGS sq2 feat2 data2 : xs)
+              | sq1 == sq2 && feat1 == feat2 = glue (EvGS sq1 feat1 (data1 <> data2) : xs)
+          glue (EvGR sq1 feat1 data1 : EvGR sq2 feat2 data2 : xs)
+              | sq1 == sq2 && feat1 == feat2 = glue (EvGR sq1 feat1 (data1 <> data2) : xs)
+          glue (x1:x2:xs) = x1 : glue (x2:xs)
+          glue rest       = rest
+
 
 instance Canonical Stockholm where
     canonical (Stockholm fileanns clmnanns stseqs) =
