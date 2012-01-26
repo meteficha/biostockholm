@@ -324,37 +324,41 @@ insertPA_GR sq ann pa = pa { paSeqColAnns  = insertSM sq ann (paSeqColAnns pa) }
 
 -- | Conduit that parses 'Event'@s@ into documents 'Stockholm'.
 parseDoc :: C.Resource m => C.Conduit Event m Stockholm
-parseDoc = C.sequenceSink () (\() -> begin)
+parseDoc = C.conduitState LookingForHeader push close
     where
+
       -- FIXME: Nice exceptions
 
-      begin = do
-        mx <- CL.head
-        case mx of
-          Nothing       -> return C.Stop
-          Just EvHeader -> continue (emptyPA, M.empty)
-          Just x        -> fail $ "unexpected " ++ show x
+      close LookingForHeader              = return []
+      close (InsideStockholm annots seqs) = return [makeStockholm annots seqs]
 
-      continue acc = do
-        Just x <- CL.head
-        go acc x
-
-      go _   EvHeader      = fail "unexpected header"
-      go acc (EvComment _) = continue acc
-      go (!annots, !seqs) EvEnd =
-          return $ C.Emit () [makeStockholm annots seqs]
-      go (!annots, !seqs) (EvSeqData label data_) =
+      push LookingForHeader EvHeader =
+          continue (emptyPA, M.empty)
+      push (InsideStockholm annots seqs) EvHeader =
+          fail "parseDoc: unexpected header"
+      push (InsideStockholm annots seqs) EvEnd =
+          return (LookingForHeader, C.Producing [makeStockholm annots seqs])
+      push (InsideStockholm annots seqs) (EvSeqData label data_) =
           continue (annots, insertDM (label, l data_) seqs)
-      go (!annots, !seqs) (EvGF feat data_) =
+      push (InsideStockholm annots seqs) (EvGF feat data_) =
           continue (insertPA_GF (Ann (parseFileFeature feat) (l data_)) annots, seqs)
-      go (!annots, !seqs) (EvGC feat data_) =
+      push (InsideStockholm annots seqs) (EvGC feat data_) =
           continue (insertPA_GC (Ann (parseClmnFeature feat) (l data_)) annots, seqs)
-      go (!annots, !seqs) (EvGS sq feat data_) =
+      push (InsideStockholm annots seqs) (EvGS sq feat data_) =
           continue (insertPA_GS sq (Ann (parseSeqFeature feat) (l data_)) annots, seqs)
-      go (!annots, !seqs) (EvGR sq feat data_) =
+      push (InsideStockholm annots seqs) (EvGR sq feat data_) =
           continue (insertPA_GR sq (Ann (parseClmnFeature feat) (l data_)) annots, seqs)
 
+      continue (annots, seqs) = return (InsideStockholm annots seqs, C.Producing [])
+      {-# INLINE continue #-}
+
       l = L.fromChunks . return
+
+data ParseDoc = LookingForHeader
+              | InsideStockholm
+                  { pdAnnots :: {-# UNPACK #-} !PartialAnns
+                  , pdSeqs   :: {-# UNPACK #-} !(DiffMap B.ByteString L.ByteString)
+                  }
 
 
 -- | Glue everything into place, as the Stockholm format lets
