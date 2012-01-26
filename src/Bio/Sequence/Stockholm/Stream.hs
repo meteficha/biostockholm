@@ -10,10 +10,12 @@ module Bio.Sequence.Stockholm.Stream
 
 -- from base
 import Control.Applicative
+import Control.Arrow
 import Data.Monoid (mappend)
 
 -- from bytestring
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 
 -- from conduit
 import qualified Data.Conduit as C
@@ -54,27 +56,19 @@ data Event = EvHeader
              deriving (Eq, Ord, Show)
 
 
--- | Parse an 'Event'.
+-- | Parse an 'Event' after 'EvHeader'.
 eventParser :: A.Parser Event
-eventParser = hash *> (ann
-                   <|> header
-                   <|> comment)
+eventParser = hash *> (ann <|> comment)
           <|> end
           <|> seqdata
     where
-      spaces = A.skipWhile A8.isHorizontalSpace
-      word   = A.takeTill  A8.isHorizontalSpace <* spaces
-      tillNextLine = A.takeTill A8.isEndOfLine <* A8.endOfLine
-      nextLine     = spaces <* A8.endOfLine
+      word = A.takeTill A8.isHorizontalSpace <* spaces
+      tillNextLine = A.takeByteString
 
       hash    = A8.char '#'
-      header  = EvHeader  <$  spaces <* mystring "STOCKHOLM 1.0" <* nextLine
       comment = EvComment <$> tillNextLine
-      end     = EvEnd     <$  A8.string "//" <* nextLine
+      end     = EvEnd     <$  A8.string "//" <* spaces
       seqdata = EvSeqData <$> word <*> tillNextLine
-
-      mystring (x:xs) = A8.char x *> mystring xs
-      mystring []     = pure ()
 
       ann = A8.string "=G" *> (gf <|> gc <|> gs <|> gr)
           where
@@ -83,19 +77,39 @@ eventParser = hash *> (ann
             gs = EvGS <$ A8.char 'S' <* spaces <*> word <*> word <*> tillNextLine
             gr = EvGR <$ A8.char 'R' <* spaces <*> word <*> word <*> tillNextLine
 
+-- | Parse 'EvHeader'.
+headerParser :: A.Parser Event
+headerParser = EvHeader <$ A8.char '#' <* spaces <* mystring "STOCKHOLM 1.0" <* spaces
+    where
+      mystring (x:xs) = A8.char x *> mystring xs
+      mystring []     = pure ()
+
+spaces :: A.Parser ()
+spaces = A.skipWhile  A8.isHorizontalSpace
 
 
 -- | Conduit that parses a file into events.
 parseEvents :: C.ResourceThrow m => C.Conduit B.ByteString m Event
-parseEvents = C.sequenceSink () go
+parseEvents = C.sequenceSink LookingForHeader go
     where
-      go _ = do
-        CB.dropWhile A8.isSpace_w8
-        mevent <- sinkParser $     Nothing <$  A8.endOfInput
-                               <|> Just    <$> eventParser
-        return $ case mevent of
-                   Nothing    -> C.Stop
-                   Just event -> C.Emit () [event]
+      go LookingForHeader = do
+        dropSpaces
+        let emit = C.Emit InsideStockholm . (:[])
+        insideLine C.=$ sinkParser $  C.Stop <$  A8.endOfInput
+                                  <|> emit   <$> headerParser
+
+      go InsideStockholm = do
+        dropSpaces
+        event <- insideLine C.=$ sinkParser eventParser
+        let newState = case event of
+                         EvEnd -> LookingForHeader
+                         _     -> InsideStockholm
+        return $ C.Emit newState [event]
+
+      dropSpaces = CB.dropWhile A8.isSpace_w8
+      insideLine = CB.takeWhile (/= 10)
+
+data ParseEvents = LookingForHeader | InsideStockholm
 
 
 -- | Pretty print an event.
