@@ -2,7 +2,9 @@
 
 -- from base
 import Control.Applicative
+import Control.Monad (zipWithM_)
 import Data.List (sort)
+import System.Environment (getEnv)
 import System.IO.Unsafe (unsafePerformIO)
 
 -- from containers
@@ -15,8 +17,13 @@ import qualified Data.ByteString.Lazy.Char8 as L
 -- from biocore
 import Bio.Core.Sequence
 
+-- from transformers
+import Control.Monad.IO.Class (liftIO)
+
 -- from conduit
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Lazy as CZ
 import qualified Data.Conduit.List as CL
 
 -- from QuickCheck
@@ -59,6 +66,14 @@ main =
           rendered <- strictRender sto
           again    <- strictParse  rendered
           return (canonical again == canonical sto)
+
+    describe "parseStockholm/renderStockholm/parseStockholm" $ do
+      it "roundtrips RFAM" $ do
+        rfamFp <- getEnv "RFAM"
+        C.runResourceT $ do
+          parsed1 <- CZ.lazyConsume $ CB.sourceFile rfamFp C.$= parseStockholm
+          parsed2 <- CZ.lazyConsume $ CL.sourceList parsed1 C.$= renderStockholm C.$= parseStockholm
+          liftIO (zipWithM_ (@?=) parsed2 parsed1)
 
     describe "renderEvents/parseEvents" $ do
       prop "passes QuickCheck property" $ \(events :: [Event]) ->
