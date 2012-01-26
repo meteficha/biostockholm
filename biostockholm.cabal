@@ -58,6 +58,7 @@ Test-suite runtests
       , biocore            >= 0.1   && < 0.3
 
       , hspec              == 0.9.*
-      , HUnit              == 1.2.*
+      , HUnit
+      , QuickCheck
 
       , biostockholm
