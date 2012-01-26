@@ -51,7 +51,7 @@ import Bio.Sequence.Stockholm.Stream
 data Stockholm = Stockholm [Ann FileAnnotation]
                            [Ann (ColumnAnnotation InFile)]
                            [StockholmSeq]
-                 deriving (Show, Eq, Typeable)
+                 deriving (Show, Eq, Ord, Typeable)
 
 instance NFData Stockholm where
     rnf (Stockholm file clmn seqs) = rnf file `seq` rnf clmn `seq` rnf seqs
@@ -62,7 +62,7 @@ data StockholmSeq = StSeq !SeqLabel
                           !SeqData
                           [Ann SequenceAnnotation]
                           [Ann (ColumnAnnotation InSeq)]
-                    deriving (Eq, Typeable)
+                    deriving (Eq, Ord, Typeable)
 
 -- We don't derive Show to be able support biocore-0.1, which
 -- doesn't have Show instances for SeqLabel and SeqData.

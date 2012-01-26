@@ -2,6 +2,7 @@
 
 -- from base
 import Control.Applicative
+import Data.List (sort)
 import System.IO.Unsafe (unsafePerformIO)
 
 -- from bytestring
@@ -54,7 +55,7 @@ main =
         unsafePerformIO $ do
           rendered <- strictRender sto
           again    <- strictParse  rendered
-          return (again == sto)
+          return (canonical again == canonical sto)
 
 
 ----------------------------------------------------------------------
@@ -143,10 +144,7 @@ instance Arbitrary Stockholm where
 
 
 instance Arbitrary StockholmSeq where
-    arbitrary = StSeq <$> (SeqLabel <$> arbitrary)
-                      <*> arbitrary
-                      <*> arbitrary
-                      <*> arbitrary
+    arbitrary = StSeq <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     shrink (StSeq label data_ seqanns clmnanns) =
         StSeq label data_ <$> shrink seqanns <*> shrink clmnanns
 
@@ -174,6 +172,9 @@ annArbitraryHelper list other =
   frequency $ (1, other <$> arbitrary) :
               [(5, pure x) | x <- list]
 
+instance Arbitrary SeqLabel where
+    arbitrary = SeqLabel <$> (L.cons <$> arbitrary <*> arbitrary)
+
 instance Arbitrary SeqData where
     arbitrary = SeqData . L.pack <$> listOf1 (elements ['A', 'T', 'C', 'G'])
 
@@ -182,3 +183,31 @@ instance Arbitrary B.ByteString where
 
 instance Arbitrary L.ByteString where
     arbitrary = L.fromChunks <$> arbitrary
+
+
+----------------------------------------------------------------------
+
+class Canonical a where
+    canonical :: a -> a
+    canonical = id
+
+instance Canonical Event where
+instance Canonical (Ann d) where
+instance Canonical FileAnnotation where
+instance Canonical (ColumnAnnotation a) where
+instance Canonical SequenceAnnotation where
+instance Canonical SeqLabel where
+instance Canonical SeqData where
+instance Canonical B.ByteString where
+instance Canonical L.ByteString where
+
+instance Canonical Stockholm where
+    canonical (Stockholm fileanns clmnanns stseqs) =
+        Stockholm (canonical fileanns) (canonical clmnanns) (canonical stseqs)
+
+instance Canonical StockholmSeq where
+    canonical (StSeq label data_ seqanns clmnanns) =
+        StSeq (canonical label) (canonical data_) (canonical seqanns) (canonical clmnanns)
+
+instance Ord a => Canonical [a] where
+    canonical = sort
