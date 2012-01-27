@@ -1,6 +1,6 @@
 Name:                biostockholm
 Version:             0.2
-Synopsis:            Reading and writing Stockholm files (multiple sequence alignment, used by Rfam and Infernal).
+Synopsis:            Parsing and rendering of Stockholm files (used by Pfam, Rfam and Infernal).
 License:             BSD3
 License-file:        LICENSE
 Author:              Felipe Lessa
