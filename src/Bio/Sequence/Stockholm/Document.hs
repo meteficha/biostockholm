@@ -361,7 +361,7 @@ parseDoc = C.conduitState LookingForHeader push close
 data ParseDoc = LookingForHeader
               | InsideStockholm
                   { pdAnnots :: {-# UNPACK #-} !PartialAnns
-                  , pdSeqs   :: {-# UNPACK #-} !(DiffMap B.ByteString L.ByteString)
+                  , pdSeqs   :: !(DiffMap B.ByteString L.ByteString)
                   }
 
 
