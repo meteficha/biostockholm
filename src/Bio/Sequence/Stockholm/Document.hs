@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, CPP, EmptyDataDecls, DeriveDataTypeable, OverloadedStrings #-}
-
--- | Take low-level events and turn them high-level data structures.
+-- | Take low-level 'Event'@s@ and turn them high-level data
+-- structures.
 module Bio.Sequence.Stockholm.Document
     ( -- * Data types
       Stockholm(..)
