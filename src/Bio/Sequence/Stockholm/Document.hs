@@ -332,9 +332,15 @@ parseDoc = C.conduitState LookingForHeader push close
       close LookingForHeader              = return []
       close (InsideStockholm annots seqs) = return [makeStockholm annots seqs]
 
+      push state (EvComment _) =
+          return (state, C.Producing [])
+
       push LookingForHeader EvHeader =
           continue (emptyPA, M.empty)
-      push (InsideStockholm annots seqs) EvHeader =
+      push LookingForHeader x =
+          fail $ "parseDoc: unexpected " ++ show x ++ " before header"
+
+      push (InsideStockholm _ _) EvHeader =
           fail "parseDoc: unexpected header"
       push (InsideStockholm annots seqs) EvEnd =
           return (LookingForHeader, C.Producing [makeStockholm annots seqs])
