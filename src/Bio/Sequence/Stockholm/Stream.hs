@@ -10,12 +10,11 @@ module Bio.Sequence.Stockholm.Stream
 
 -- from base
 import Control.Applicative
-import Control.Arrow
 import Data.Monoid (mappend)
 
 -- from bytestring
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as L
 
 -- from conduit
 import qualified Data.Conduit as C
@@ -41,17 +40,17 @@ data Event = EvHeader
              -- ^ @# STOCKHOLM 1.0@
            | EvEnd
              -- ^ @\/\/@
-           | EvComment B.ByteString
+           | EvComment L.ByteString
              -- ^ @# ....@
-           | EvSeqData B.ByteString B.ByteString
+           | EvSeqData B.ByteString L.ByteString
              -- ^ @seqlabel seqdata@
-           | EvGF B.ByteString B.ByteString
+           | EvGF B.ByteString L.ByteString
              -- ^ @#GF feature data@
-           | EvGC B.ByteString B.ByteString
+           | EvGC B.ByteString L.ByteString
              -- ^ @#GC feature data@
-           | EvGS B.ByteString B.ByteString B.ByteString
+           | EvGS B.ByteString B.ByteString L.ByteString
              -- ^ @#GS seqlabel feature data@
-           | EvGR B.ByteString B.ByteString B.ByteString
+           | EvGR B.ByteString B.ByteString L.ByteString
              -- ^ @#GR seqlabel feature data@
              deriving (Eq, Ord, Show)
 
@@ -63,7 +62,7 @@ eventParser = hash *> (ann <|> comment)
           <|> seqdata
     where
       word = A.takeTill A8.isHorizontalSpace <* spaces
-      tillNextLine = A.takeByteString
+      tillNextLine = A.takeLazyByteString
 
       hash    = A8.char '#'
       comment = EvComment <$> tillNextLine
@@ -118,13 +117,14 @@ eventPrinter ev =
     case ev of
       EvHeader                    -> bs "# STOCKHOLM 1.0\n"
       EvEnd                       -> bs "//\n"
-      EvComment comment           -> bs "#" <> bs comment <> n
-      EvSeqData seqlabel seqdata  -> bs seqlabel <> s <> bs seqdata <> n
-      EvGF          feature data_ -> bs "#=GF " <> bs feature  <> s <> bs data_ <> n
-      EvGC          feature data_ -> bs "#=GC " <> bs feature  <> s <> bs data_ <> n
-      EvGS seqlabel feature data_ -> bs "#=GS " <> bs seqlabel <> s <> bs feature <> s <> bs data_ <> n
-      EvGR seqlabel feature data_ -> bs "#=GR " <> bs seqlabel <> s <> bs feature <> s <> bs data_ <> n
-    where bs = Blaze.fromByteString
+      EvComment comment           -> bs "#" <> lbs comment <> n
+      EvSeqData seqlabel seqdata  -> bs seqlabel <> s <> lbs seqdata <> n
+      EvGF          feature data_ -> bs "#=GF " <> bs feature  <> s <> lbs data_ <> n
+      EvGC          feature data_ -> bs "#=GC " <> bs feature  <> s <> lbs data_ <> n
+      EvGS seqlabel feature data_ -> bs "#=GS " <> bs seqlabel <> s <> bs feature <> s <> lbs data_ <> n
+      EvGR seqlabel feature data_ -> bs "#=GR " <> bs seqlabel <> s <> bs feature <> s <> lbs data_ <> n
+    where bs  = Blaze.fromByteString
+          lbs = Blaze.fromLazyByteString
           (<>) = mappend
           s = bs " "
           n = bs "\n"

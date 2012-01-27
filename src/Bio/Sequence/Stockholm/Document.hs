@@ -345,20 +345,18 @@ parseDoc = C.conduitState LookingForHeader push close
       push (InsideStockholm annots seqs) EvEnd =
           return (LookingForHeader, C.Producing [makeStockholm annots seqs])
       push (InsideStockholm annots seqs) (EvSeqData label data_) =
-          continue (annots, insertDM (label, l data_) seqs)
+          continue (annots, insertDM (label, data_) seqs)
       push (InsideStockholm annots seqs) (EvGF feat data_) =
-          continue (insertPA_GF (Ann (parseFileFeature feat) (l data_)) annots, seqs)
+          continue (insertPA_GF (Ann (parseFileFeature feat) data_) annots, seqs)
       push (InsideStockholm annots seqs) (EvGC feat data_) =
-          continue (insertPA_GC (Ann (parseClmnFeature feat) (l data_)) annots, seqs)
+          continue (insertPA_GC (Ann (parseClmnFeature feat) data_) annots, seqs)
       push (InsideStockholm annots seqs) (EvGS sq feat data_) =
-          continue (insertPA_GS sq (Ann (parseSeqFeature feat) (l data_)) annots, seqs)
+          continue (insertPA_GS sq (Ann (parseSeqFeature feat) data_) annots, seqs)
       push (InsideStockholm annots seqs) (EvGR sq feat data_) =
-          continue (insertPA_GR sq (Ann (parseClmnFeature feat) (l data_)) annots, seqs)
+          continue (insertPA_GR sq (Ann (parseClmnFeature feat) data_) annots, seqs)
 
       continue (annots, seqs) = return (InsideStockholm annots seqs, C.Producing [])
       {-# INLINE continue #-}
-
-      l = L.fromChunks . return
 
 data ParseDoc = LookingForHeader
               | InsideStockholm
@@ -397,7 +395,7 @@ renderDoc = CL.concatMap toEvents
 
       toEventsFileAnns []     = id
       toEventsFileAnns (a:as) =
-          (EvGF (showFileFeature $ feature a) (strict $ text a) :) .
+          (EvGF (showFileFeature $ feature a) (text a) :) .
           toEventsFileAnns as
 
       toEventsFileClmn []     = id
@@ -410,12 +408,12 @@ renderDoc = CL.concatMap toEvents
           toEventsSeqAnns name' sa .
           toEventsSeqClmn name' ca .
           toEventsSeqs xs
-              where name' = strict name
+              where name' = B.concat $ L.toChunks name
       toEventsSeqs [] = id
 
       toEventsSeqAnns _ []     = id
       toEventsSeqAnns n (a:as) =
-          (EvGS n (showSeqFeature $ feature a) (strict $ text a) :) .
+          (EvGS n (showSeqFeature $ feature a) (text a) :) .
           toEventsSeqAnns n as
 
       toEventsSeqClmn _ []     = id
@@ -423,9 +421,7 @@ renderDoc = CL.concatMap toEvents
           wrap (EvGR n (showClmnFeature $ feature a)) (text a) .
           toEventsSeqClmn n as
 
-      wrap :: (B.ByteString -> b) -> L.ByteString -> [b] -> [b]
+      wrap :: (L.ByteString -> b) -> L.ByteString -> [b] -> [b]
       wrap mk bs = case L.splitAt 70 bs of
-                     (x, "") -> (mk (strict x) :)
-                     (x, xs) -> (mk (strict x) :) . wrap mk xs
-
-      strict = B.concat . L.toChunks
+                     (x, "") -> (mk x :)
+                     (x, xs) -> (mk x :) . wrap mk xs
