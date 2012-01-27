@@ -7,7 +7,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 
-main = main_doc
+main = main_event
 
 main_doc = C.runResourceT $ CB.sourceHandle stdin C.$$ parseStockholm C.=$ CL.mapM_ printName
     where
