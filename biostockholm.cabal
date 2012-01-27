@@ -8,6 +8,10 @@ Maintainer:          felipe.lessa@gmail.com
 Category:            Bioinformatics
 Build-type:          Simple
 Cabal-version:       >=1.8
+Extra-source-files:
+  benchmarks/benchmark_v0.1.hs
+  benchmarks/benchmark_v0.2.hs
+  tests/runtests.hs
 Description:
   Parsing and rendering of files in Stockholm 1.0 format.  Among
   the users of the Stockholm format are Pfam, Rfam and Infernal.
