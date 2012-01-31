@@ -85,7 +85,7 @@ main =
           liftIO (zipWithM_ (@?=) parsed2 parsed1)
 
     describe "renderEvents/parseEvents" $ do
-      prop "passes QuickCheck property" $ \(events :: [Event]) ->
+      prop "passes QuickCheck property" $ forAll eventList $ \(events :: [Event]) ->
         unsafePerformIO $ do
           rendered <- C.runResourceT $ CL.sourceList events   C.$$ renderEvents C.=$ CL.consume
           again    <- C.runResourceT $ CL.sourceList rendered C.$$ parseEvents C.=$ CL.consume
@@ -198,7 +198,7 @@ instance Arbitrary Event where
 
 eventList :: Gen [Event]
 eventList = sized $ \s -> frequency [ (100, single)
-                                    , (s, (++) <$> single <*> (resize (s `div` 2) eventList)) ]
+                                    , (s, (++) <$> single <*> (resize (s - 1) eventList)) ]
     where
       single = (\xs -> EvHeader : xs ++ [EvEnd]) <$> listOf arbitrary
 
