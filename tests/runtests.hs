@@ -192,7 +192,7 @@ instance Arbitrary Event where
       , (2,  EvGR      <$> seqlabel <*> feature <*> arbitrary)
       ]
         where seqlabel = strict . unSL <$> arbitrary
-              seqdata  = strict . unSD <$> arbitrary
+              seqdata  = unSD <$> arbitrary
               feature  = B.pack <$> listOf1 (elements alpha)
               strict = B.concat . L.toChunks
 
@@ -283,7 +283,7 @@ instance Canonical Event where
                 (before, rest)          -> (EvHeader : before)            : separate rest
           separate (x:xs) = [x] : separate xs
           separate []     = []
-          (<>) = B.append
+          (<>) = L.append
           glue (EvSeqData sq1 data1 : EvSeqData sq2 data2 : xs)
               | sq1 == sq2 = glue (EvSeqData sq1 (data1 <> data2) : xs)
           glue (EvGF feat1 data1 : EvGF feat2 data2 : xs)
