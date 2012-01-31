@@ -60,16 +60,17 @@ eventParser :: A.Parser Event
 eventParser = hash *> (ann <|> comment)
           <|> end
           <|> seqdata
+              A.<?> "Event"
     where
       word = A.takeTill A8.isHorizontalSpace <* spaces
       tillNextLine = A.takeLazyByteString
 
       hash    = A8.char '#'
-      comment = EvComment <$> tillNextLine
-      end     = EvEnd     <$  A8.string "//" <* spaces
-      seqdata = EvSeqData <$> word <*> tillNextLine
+      comment = EvComment <$> tillNextLine A.<?> "Comment"
+      end     = EvEnd     <$  A8.string "//" <* spaces A.<?> "End of Stockholm file (//)"
+      seqdata = EvSeqData <$> word <*> tillNextLine A.<?> "Sequence data"
 
-      ann = A8.string "=G" *> (gf <|> gc <|> gs <|> gr)
+      ann = A8.string "=G" *> (gf <|> gc <|> gs <|> gr) A.<?> "Annotation"
           where
             gf = EvGF <$ A8.char 'F' <* spaces          <*> word <*> tillNextLine
             gc = EvGC <$ A8.char 'C' <* spaces          <*> word <*> tillNextLine
@@ -79,6 +80,7 @@ eventParser = hash *> (ann <|> comment)
 -- | Parse 'EvHeader'.
 headerParser :: A.Parser Event
 headerParser = EvHeader <$ A8.char '#' <* spaces <* mystring "STOCKHOLM 1.0" <* spaces
+               A.<?> "Stockholm Header"
     where
       mystring (x:xs) = A8.char x *> mystring xs
       mystring []     = pure ()
