@@ -333,7 +333,7 @@ parseDoc = C.conduitState LookingForHeader push close
       close (InsideStockholm annots seqs) = return [makeStockholm annots seqs]
 
       push state (EvComment _) =
-          return (state, C.Producing [])
+          return (C.StateProducing state [])
 
       push LookingForHeader EvHeader =
           continue (emptyPA, M.empty)
@@ -343,7 +343,7 @@ parseDoc = C.conduitState LookingForHeader push close
       push (InsideStockholm _ _) EvHeader =
           fail "parseDoc: unexpected header"
       push (InsideStockholm annots seqs) EvEnd =
-          return (LookingForHeader, C.Producing [makeStockholm annots seqs])
+          return (C.StateProducing LookingForHeader [makeStockholm annots seqs])
       push (InsideStockholm annots seqs) (EvSeqData label data_) =
           continue (annots, insertDM (label, data_) seqs)
       push (InsideStockholm annots seqs) (EvGF feat data_) =
@@ -355,7 +355,7 @@ parseDoc = C.conduitState LookingForHeader push close
       push (InsideStockholm annots seqs) (EvGR sq feat data_) =
           continue (insertPA_GR sq (Ann (parseClmnFeature feat) data_) annots, seqs)
 
-      continue (annots, seqs) = return (InsideStockholm annots seqs, C.Producing [])
+      continue (annots, seqs) = return (C.StateProducing (InsideStockholm annots seqs) [])
       {-# INLINE continue #-}
 
 data ParseDoc = LookingForHeader
