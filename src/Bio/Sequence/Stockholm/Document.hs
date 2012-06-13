@@ -323,7 +323,7 @@ insertPA_GR sq ann pa = pa { paSeqColAnns  = insertSM sq ann (paSeqColAnns pa) }
 
 
 -- | Conduit that parses 'Event'@s@ into documents 'Stockholm'.
-parseDoc :: C.Resource m => C.Conduit Event m Stockholm
+parseDoc :: Monad m => C.Conduit Event m Stockholm
 parseDoc = C.conduitState LookingForHeader push close
     where
 
@@ -383,7 +383,7 @@ makeStockholm annots seqsDM =
 
 
 -- | Conduit that renders 'Stockholm'@s@ into 'Event'@s@.
-renderDoc :: C.Resource m => C.Conduit Stockholm m Event
+renderDoc :: Monad m => C.Conduit Stockholm m Event
 renderDoc = CL.concatMap toEvents
     where
       toEvents (Stockholm file clmn seqs) =

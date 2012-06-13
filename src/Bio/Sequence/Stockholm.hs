@@ -67,12 +67,12 @@ findAnn x = fmap text . find ((== x) . feature)
 -- multiple files are read independently.  If you need to process
 -- large Stockholm files, consider using the streaming interface
 -- on "Bio.Sequence.Stockholm.Stream".
-parseStockholm :: C.ResourceThrow m => C.Conduit B.ByteString m Stockholm
+parseStockholm :: C.MonadThrow m => C.Conduit B.ByteString m Stockholm
 parseStockholm = parseEvents C.=$= parseDoc
 
 
 -- | Pretty prints an Stockholm file.
-renderStockholm :: C.ResourceUnsafeIO m => C.Conduit Stockholm m B.ByteString
+renderStockholm :: C.MonadUnsafeIO m => C.Conduit Stockholm m B.ByteString
 renderStockholm = renderDoc C.=$= renderEvents
 
 

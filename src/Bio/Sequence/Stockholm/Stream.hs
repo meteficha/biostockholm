@@ -90,14 +90,14 @@ spaces = A.skipWhile  A8.isHorizontalSpace
 
 
 -- | Conduit that parses a file into events.
-parseEvents :: C.ResourceThrow m => C.Conduit B.ByteString m Event
+parseEvents :: C.MonadThrow m => C.Conduit B.ByteString m Event
 parseEvents = C.sequenceSink LookingForHeader go
     where
       go LookingForHeader = do
         dropSpaces
         let emit = C.Emit InsideStockholm . (:[])
-        insideLine C.=$ sinkParser $  C.Stop <$  A8.endOfInput
-                                  <|> emit   <$> headerParser
+        insideLine C.=$ (sinkParser $  C.Stop <$  A8.endOfInput
+                                   <|> emit   <$> headerParser)
 
       go InsideStockholm = do
         dropSpaces
@@ -133,5 +133,5 @@ eventPrinter ev =
 
 
 -- | Conduit that pretty prints an event stream into a file.
-renderEvents :: C.ResourceUnsafeIO m => C.Conduit Event m B.ByteString
+renderEvents :: C.MonadUnsafeIO m => C.Conduit Event m B.ByteString
 renderEvents = CL.map eventPrinter C.=$= builderToByteString
