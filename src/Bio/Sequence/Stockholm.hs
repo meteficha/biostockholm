@@ -27,7 +27,7 @@ module Bio.Sequence.Stockholm
       -- * Printing
     , renderStockholm
 
-      -- * Lazy I/O
+      -- * Lazy ByteStrings
     , lazyParseStockholm
     , lazyRenderStockholm
     )
@@ -43,7 +43,6 @@ import qualified Data.ByteString.Lazy as L
 
 -- from conduit
 import qualified Data.Conduit as C
-import qualified Data.Conduit.Lazy as CZ
 import qualified Data.Conduit.List as CL
 
 -- from this package
@@ -76,27 +75,28 @@ renderStockholm :: C.MonadUnsafeIO m => C.Conduit Stockholm m B.ByteString
 renderStockholm = renderDoc C.=$= renderEvents
 
 
--- | Use lazy I/O to parse a stream of files in Stockholm 1.0
--- format.  We recommend using 'parseStockholm'.
+-- | Strictly parse a stream of files in Stockholm 1.0 format
+-- from a lazy 'B.ByteString'.  We recommend using
+-- 'parseStockholm'.
 lazyParseStockholm :: L.ByteString -> [Stockholm]
 lazyParseStockholm lbs =
     unsafePerformIO $
     C.runResourceT $
-      CZ.lazyConsume $
-        CL.sourceList (L.toChunks lbs) C.$=
-        parseStockholm
+      CL.sourceList (L.toChunks lbs) C.$=
+      parseStockholm C.$$
+      CL.consume
 {-# NOINLINE lazyParseStockholm #-}
 
 
--- | Use lazy I/O to render a list of 'Stockholm'@s@ into a
--- stream of files in Stockholm 1.0 format.  We recommend using
+-- | Strictly render a list of 'Stockholm'@s@ into a lazy
+-- 'ByteString' in Stockholm 1.0 format.  We recommend using
 -- 'renderStockholm'.
 lazyRenderStockholm :: [Stockholm] -> L.ByteString
 lazyRenderStockholm stos =
     L.fromChunks $
     unsafePerformIO $
     C.runResourceT $
-     CZ.lazyConsume $
-       CL.sourceList stos C.$=
-       renderStockholm
+     CL.sourceList stos C.$=
+     renderStockholm C.$$
+     CL.consume
 {-# NOINLINE lazyRenderStockholm #-}
