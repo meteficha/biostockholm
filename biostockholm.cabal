@@ -1,5 +1,5 @@
 Name:                biostockholm
-Version:             0.3.3
+Version:             0.3.4
 Synopsis:            Parsing and rendering of Stockholm files (used by Pfam, Rfam and Infernal).
 License:             BSD3
 License-file:        LICENSE
