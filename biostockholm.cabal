@@ -25,7 +25,7 @@ Description:
   * <http://en.wikipedia.org/wiki/Stockholm_format>
 
 Source-repository head
-  Type:     darcs
+  Type:     git
   Location: https://github.com/meteficha/biostockholm
 
 Library
