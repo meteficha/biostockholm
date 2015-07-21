@@ -26,7 +26,7 @@ Description:
 
 Source-repository head
   Type:     darcs
-  Location: http://patch-tag.com/r/felipe/biostockholm
+  Location: https://github.com/meteficha/biostockholm
 
 Library
   Hs-Source-Dirs: src
